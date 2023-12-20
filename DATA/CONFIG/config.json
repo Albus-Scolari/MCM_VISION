@@ -1,0 +1,9 @@
+{
+  "SavePhotos": true,
+  "LaserIp": "127.0.0.1",
+  "LaserProt": 5195,
+  "Pos1Photo": [ 0, 0, 200 ],
+  "Pos2Photo": [ 500, 0, 200 ],
+  "ZeroPlane": 0,
+  "ScaleFactor": 0
+}
