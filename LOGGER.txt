@@ -1,0 +1,87 @@
+MODULE LOGGER
+
+!////////////////
+!GLOBAL VARIABLES
+!////////////////
+!PC communication
+VAR socketdev clientSocket;
+VAR socketdev serverSocket;
+PERS string ipController;
+PERS num loggerPort:= 5001;
+PERS bool LaserON;
+!Robot configuration	
+PERS tooldata currentTool;    
+PERS wobjdata currentWobj;
+VAR speeddata currentSpeed;
+VAR zonedata currentZone;
+VAR robtarget position;
+
+!// Logger Start/Stop for profilometer synchronization
+PERS bool profileAcq;
+
+!//Logger sampling rate
+PERS num sampleRate;
+PERS num bufferSize := 30;
+
+VAR rawbytes packet;
+
+PROC ServerCreateAndConnect(string ip, num port)
+	VAR string clientIP;
+	
+	SocketCreate serverSocket;
+	SocketBind serverSocket, ip, port;
+	SocketListen serverSocket;
+	TPWrite "LOGGER: Logger waiting for incomming connections ...";
+	WHILE SocketGetStatus(clientSocket) <> SOCKET_CONNECTED DO
+		SocketAccept serverSocket,clientSocket \ClientAddress:=clientIP \Time:=WAIT_MAX;
+		IF SocketGetStatus(clientSocket) <> SOCKET_CONNECTED THEN
+			TPWrite "LOGGER: Problem serving an incomming connection.";
+			TPWrite "LOGGER: Try reconnecting.";
+		ENDIF
+		 !Wait 0.5 seconds for the next reconnection
+		 WaitTime 0.5;
+	ENDWHILE
+	TPWrite "LOGGER: Connected to IP " + clientIP;
+ENDPROC
+
+
+
+
+PROC main()
+	VAR string data;
+	VAR robtarget position;
+    VAR string sendString;
+	VAR bool connected;
+    VAR string response;
+    VAR num profileIndex := -1;
+    VAR num bufferIndex:= 0;
+    
+	connected:=FALSE;
+	ServerCreateAndConnect ipController, loggerPort;
+	connected:=TRUE;
+    
+	WHILE TRUE DO !gestire stop acquisition con multiplo di buffersize, in modo da finire l'ultimo buffer e poi stoppare effettivamente
+    !pacchetto è 7x4+2=30 byte inseriti in un buffer di 30 posti (900 byte è la dimensione del messaggio inviato)n 
+        IF LaserON=TRUE THEN
+            PulseDO\PLength:=0.002, cx_trig1;
+        ENDIF
+		WaitTime sampleRate;
+	ENDWHILE
+    
+	ERROR
+	IF ERRNO=ERR_SOCK_CLOSED THEN
+		TPWrite "LOGGER: Client has closed connection.";
+	ELSE
+		TPWrite "LOGGER: Connection lost: Unknown problem.";
+	ENDIF
+	connected:=FALSE;
+	!Closing the server
+	SocketClose clientSocket;
+	SocketClose serverSocket;
+	!Reinitiate the server
+	ServerCreateAndConnect ipController,loggerPort;
+	connected:= TRUE;
+	RETRY;
+ENDPROC
+
+ENDMODULE
